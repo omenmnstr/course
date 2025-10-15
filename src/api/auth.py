@@ -1,10 +1,11 @@
 from datetime import datetime, timezone, timedelta
-
-from fastapi import APIRouter, HTTPException, Request, Response
-
+from fastapi import APIRouter, HTTPException,  Response
+from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 import jwt
+from starlette.responses import JSONResponse
 
+from api.dependencies import UserIdDep
 from config import settings
 from services.auth import AuthService
 from src.repositories.users import UsersRepository
@@ -42,8 +43,16 @@ async def login_user(
         response.set_cookie("access_token", access_token)
         return {"access_token": access_token}
 
-@router.get("/only_auth")
-async def only_auth(
-    request: Request,
+@router.get("/me")
+async def get_me(
+    user_id: UserIdDep
 ):
-    access_token = request.cookies.get("access_token") or None
+    async with async_session_maker() as session:
+        user = await UsersRepository(session).get_one_or_none(id=user_id)
+        return user
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    return {"status": "OK"}
