@@ -1,9 +1,9 @@
 from fastapi import Query, APIRouter, Body
-from repositories.hotels import HotelsRepository
-from src.api.dependencies import PaginationDep
-from src.database import async_session_maker
 
-from src.schemas.hotels import HotelAdd, HotelPATCH
+from src.repositories.hotels import HotelsRepository
+from src.api.dependencies import PaginationDep, DBDep
+from src.database import async_session_maker
+from src.schemas.hotels import HotelPatch, HotelAdd
 
 router = APIRouter(prefix="/hotels", tags=["Отели"])
 
@@ -11,25 +11,24 @@ router = APIRouter(prefix="/hotels", tags=["Отели"])
 @router.get("")
 async def get_hotels(
         pagination: PaginationDep,
+        db: DBDep,
         location: str | None = Query(None, description="Локация"),
         title: str | None = Query(None, description="Название отеля"),
 ):
     per_page = pagination.per_page or 5
-    async with async_session_maker() as session:
-        return await HotelsRepository(session).get_all(
-            location=location,
-            title=title,
-            limit=per_page,
-            offset=per_page * (pagination.page - 1)
-        )
+
+    return await db.hotels.get_all(
+        location=location,
+        title=title,
+        limit=per_page,
+        offset=per_page * (pagination.page - 1)
+    )
+
 
 @router.get("/{hotel_id}")
 async def get_hotel(hotel_id: int):
     async with async_session_maker() as session:
-        hotel = await HotelsRepository(session).get_one_or_none(id=hotel_id)
-        if not hotel:
-            return {"status": "error", "message": "Отель не найден"}
-        return hotel
+        return await HotelsRepository(session).get_one_or_none(id=hotel_id)
 
 
 @router.post("")
@@ -72,7 +71,7 @@ async def edit_hotel(hotel_id: int, hotel_data: HotelAdd):
 )
 async def partially_edit_hotel(
         hotel_id: int,
-        hotel_data: HotelPATCH,
+        hotel_data: HotelPatch,
 ):
     async with async_session_maker() as session:
         await HotelsRepository(session).edit(hotel_data, exclude_unset=True, id=hotel_id)
